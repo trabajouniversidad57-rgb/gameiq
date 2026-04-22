@@ -35,21 +35,41 @@ def load_data():
     steam_path = os.path.join('data', 'steam_top1000.csv')
     
     data = {}
+    
+    # Intento de cargar datos maestros
     if os.path.exists(master_path):
         data['master'] = pd.read_csv(master_path)
     else:
-        st.warning(f"No se encontró el dataset maestro en {master_path}. Usando datos de ejemplo.")
-        data['master'] = pd.DataFrame({
-            'Name': ['Ejemplo'], 'Genre': ['Action'], 'Platform': ['PS4'], 
-            'Year': [2016], 'Global_Sales': [1.0], 'metascore': [80], 'User_Score': [8.0],
-            'total_hours': [1000]
-        })
-        # Normalizar nombres de columnas si es necesario (el módulo espera 'metascore' en minúsculas)
+        st.info("💡 **Nota de Deploy:** Ejecutando con datos sintéticos (los archivos CSV originales están en .gitignore).")
+        # Generar datos sintéticos realistas para el Dashboard
+        genres = ['Action', 'Sports', 'Shooter', 'Role-Playing', 'Platform', 'Misc', 'Racing']
+        platforms = ['PS4', 'PS3', 'X360', 'Wii', 'PC', 'XOne']
+        years = list(range(1980, 2017))
+        
+        synthetic_master = []
+        for _ in range(500):
+            g = genres[(_ % len(genres))]
+            p = platforms[(_ % len(platforms))]
+            y = years[(_ % len(years))]
+            s = round(abs(1.0 + (0.5 * (_ % 10))), 2)
+            synthetic_master.append({
+                'Name': f'Game Sample {_}', 'Genre': g, 'Platform': p, 
+                'Year': y, 'Global_Sales': s, 'metascore': 70 + (_ % 30), 
+                'User_Score': 7.0 + (0.1 * (_ % 25)), 'total_hours': 1000 * (_ % 50)
+            })
+        data['master'] = pd.DataFrame(synthetic_master)
     
+    # Intento de cargar datos de Steam
     if os.path.exists(steam_path):
         data['steam'] = pd.read_csv(steam_path)
     else:
-        data['steam'] = pd.DataFrame({'Primary_Genre': ['Action'], 'AppID': [0]})
+        # Datos sintéticos para Steam
+        steam_genres = ['Indie', 'Action', 'Adventure', 'Casual', 'Simulation', 'Strategy']
+        synthetic_steam = []
+        for i, g in enumerate(steam_genres):
+            for _ in range(10 + i):
+                synthetic_steam.append({'Primary_Genre': g, 'AppID': _})
+        data['steam'] = pd.DataFrame(synthetic_steam)
         
     return data
 
