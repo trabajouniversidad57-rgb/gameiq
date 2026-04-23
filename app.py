@@ -46,35 +46,55 @@ def verificar_archivos():
         if not os.path.exists(ruta):
             st.error(f"⚠️ Archivo faltante: `{nombre}`. Por favor, ejecuta los scripts de obtención de datos para generarlo.")
 
+def get_sample_data():
+    """Genera datos de muestra mínimos para que la app funcione en Streamlit Cloud sin CSVs."""
+    df_sample = pd.DataFrame({
+        'Name': ['Sample Game A', 'Sample Game B', 'Sample Game C'],
+        'Genre': ['Action', 'Shooter', 'Action'],
+        'Platform': ['PS4', 'XOne', 'PC'],
+        'Year': [2015, 2016, 2014],
+        'Global_Sales': [1.5, 2.3, 0.8],
+        'metascore': [85, 78, 92],
+        'User_Score': ['8.5', '7.2', '9.0'],
+        'total_hours': [10000, 50000, 25000]
+    })
+    df_steam_sample = pd.DataFrame({
+        'AppID': [1, 2],
+        'Primary_Genre': ['Action', 'RPG'],
+        'Price_USD': [19.99, 59.99],
+        'Review_Score_Pct': [95, 88]
+    })
+    return {'master': df_sample, 'steam': df_steam_sample}
+
 @st.cache_data
 def load_data():
     current_dir = os.path.dirname(os.path.abspath(__file__))
     master_path = os.path.join(current_dir, 'data', 'master_dataset.csv')
     steam_path = os.path.join(current_dir, 'data', 'steam_top1000.csv')
     
-    data = {}
-    
-    # Intento de cargar datos maestros
+    # Si no existen los archivos (como en Streamlit Cloud), cargar datos de muestra
     if not os.path.exists(master_path):
-        data['master'] = pd.DataFrame()
-    else:
-        df_master = pd.read_csv(master_path)
-        
-        # Normalizar columnas para el módulo de IA (ia_analisis espera 'metascore' y 'Global_Sales')
-        if 'Metascore' in df_master.columns and 'metascore' not in df_master.columns:
-            df_master['metascore'] = df_master['Metascore']
-        if 'Global_Sales' not in df_master.columns:
-            df_master['Global_Sales'] = 0.0
-            
-        data['master'] = df_master
+        st.info("ℹ️ Cargando datos de muestra (los archivos CSV no están en el servidor).")
+        return get_sample_data()
     
-    # Intento de cargar datos de Steam
+    data = {}
+    df_master = pd.read_csv(master_path)
+    
+    # Normalizar columnas
+    if 'Metascore' in df_master.columns and 'metascore' not in df_master.columns:
+        df_master['metascore'] = df_master['Metascore']
+    if 'Global_Sales' not in df_master.columns:
+        df_master['Global_Sales'] = 0.0
+    
+    data['master'] = df_master
+    
     if os.path.exists(steam_path):
         data['steam'] = pd.read_csv(steam_path)
     else:
-        data['steam'] = pd.DataFrame()
+        data['steam'] = get_sample_data()['steam']
         
     return data
+
 
 verificar_archivos()
 datasets = load_data()
@@ -93,12 +113,15 @@ def display_footer():
 def handle_ia_call(func, *args, **kwargs):
     try:
         res = func(*args, **kwargs)
+        if res is None:
+            st.error("La IA no devolvió ninguna respuesta. Revisa los logs.")
+            return None
         if isinstance(res, str) and ("Error" in res or "error" in res.lower()):
-            st.error("Error al conectar con Gemini. Verifica la API key.")
+            st.error(f"Error de IA: {res}")
             return None
         return res
-    except Exception:
-        st.error("Error al conectar con Gemini. Verifica la API key.")
+    except Exception as e:
+        st.error(f"Error crítico de conexión: {str(e)}")
         return None
 
 def load_html(filename):
@@ -135,7 +158,7 @@ if modulo == "GameTrend":
             if not df_filtered.empty:
                 sales_by_year = df_filtered.groupby('Year')['Global_Sales'].sum().reset_index()
                 fig = px.line(sales_by_year, x='Year', y='Global_Sales', title=f"Ventas Globales de {genero_sel} por Año")
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, use_container_width="stretch")
             else:
                 st.info("No hay datos para el rango seleccionado.")
 
@@ -147,7 +170,7 @@ if modulo == "GameTrend":
 
         st.subheader("Carrera de Plataformas (Histórico)")
         html_race = load_html('03_race_plataformas.html')
-        components.html(html_race, height=600, scrolling=True)
+        st.components.v1.iframe(srcdoc=html_race, height=600, scrolling=True)
         
     display_footer()
 
@@ -185,7 +208,7 @@ elif modulo == "Predictor de Éxito":
                     'Ventas': [pred_val, avg_hist]
                 })
                 fig_comp = px.bar(comp_df, x='Categoría', y='Ventas', color='Categoría', title="Comparativa vs Promedio del Género")
-                st.plotly_chart(fig_comp, use_container_width=True)
+                st.plotly_chart(fig_comp, use_container_width="stretch")
                 
                 if st.button("Explicar con IA"):
                     with st.spinner("Analizando predicción..."):
@@ -209,7 +232,7 @@ elif modulo == "Crítica vs Comunidad":
         
         st.subheader("Distribución Metascore vs Userscore")
         html_scatter = load_html('04b_scatter_metascore_userscore.html')
-        components.html(html_scatter, height=600, scrolling=True)
+        st.components.v1.iframe(srcdoc=html_scatter, height=600, scrolling=True)
         
         if not df.empty:
             df_copy = df.copy()
@@ -240,11 +263,11 @@ elif modulo == "Radar Steam 2024-2026":
         with col1:
             st.subheader("Popularidad de Géneros en Steam")
             html_steam_gen = load_html('05_steam_generos.html')
-            components.html(html_steam_gen, height=500)
+            st.components.v1.iframe(srcdoc=html_steam_gen, height=500)
         with col2:
             st.subheader("Relación Precio vs Rating")
             html_steam_price = load_html('05b_steam_precio_rating.html')
-            components.html(html_steam_price, height=500)
+            st.components.v1.iframe(srcdoc=html_steam_price, height=500)
         
         if st.button("Detectar tendencias con IA"):
             with st.spinner("Analizando tendencias en Steam..."):

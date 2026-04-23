@@ -19,8 +19,16 @@ genai.configure(api_key=api_key)
 # Configurar el modelo
 model = genai.GenerativeModel("gemini-2.0-flash")
 
+def check_api_config():
+    if not api_key:
+        return "Error: No se encontró la GEMINI_API_KEY en los secretos ni en el .env."
+    return None
+
 def analizar_genero(genero, df):
     """Analiza la salud histórica de un género basándose en métricas reales."""
+    err = check_api_config()
+    if err: return err
+
     if df.empty:
         return "No hay datos para analizar."
         
@@ -47,6 +55,9 @@ Sé específico y accionable."""
 
 def predecir_exito(genero, plataforma, anio, df):
     """Predice el éxito de un lanzamiento basado en el rango histórico."""
+    err = check_api_config()
+    if err: return err
+
     if df.empty:
         return "No hay datos para predecir."
         
@@ -74,6 +85,9 @@ Basándote en el rango histórico de {p25:.2f}M a {p75:.2f}M copias, da un estim
 
 def detectar_tendencias(df_steam):
     """Identifica tendencias actuales basadas en el top 1000 de Steam."""
+    err = check_api_config()
+    if err: return err
+
     if df_steam.empty:
         return "No hay datos de Steam para detectar tendencias."
         
