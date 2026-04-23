@@ -237,8 +237,18 @@ elif modulo == "Predictor de Éxito":
             submitted = st.form_submit_button("Predecir ventas")
         
         if submitted:
-            # predecir devuelve un dict {'prediccion_millones': x, ...}
-            pred_res = modelo_predictor.predecir(gen_sel, plat_sel, year_pred, meta_sel)
+            # Al procesar el formulario, guardamos los resultados en el estado de la sesión
+            st.session_state.pred_res = modelo_predictor.predecir(gen_sel, plat_sel, year_pred, meta_sel)
+            st.session_state.pred_params = {
+                'gen': gen_sel, 
+                'plat': plat_sel, 
+                'year': year_pred
+            }
+        
+        # Si hay una predicción guardada, la mostramos (esto persiste tras hacer clic en "Explicar con IA")
+        if "pred_res" in st.session_state:
+            pred_res = st.session_state.pred_res
+            params = st.session_state.pred_params
             
             if isinstance(pred_res, dict):
                 pred_val = pred_res['prediccion_millones']
@@ -246,7 +256,7 @@ elif modulo == "Predictor de Éxito":
                 st.write(f"Rango de confianza: {pred_res['rango_bajo']:.2f}M - {pred_res['rango_alto']:.2f}M")
                 
                 # Gráfica comparativa
-                avg_hist = df[df['Genre'] == gen_sel]['Global_Sales'].mean() if not df.empty else 0
+                avg_hist = df[df['Genre'] == params['gen']]['Global_Sales'].mean() if not df.empty else 0
                 comp_df = pd.DataFrame({
                     'Categoría': ['Predicción', 'Promedio Histórico'],
                     'Ventas': [pred_val, avg_hist]
@@ -256,12 +266,12 @@ elif modulo == "Predictor de Éxito":
                 
                 if st.button("Explicar con IA"):
                     with st.spinner("Analizando predicción..."):
-                        # predecir_exito espera (genero, plataforma, anio, df)
-                        res_ia = handle_ia_call(ia_analisis.predecir_exito, gen_sel, plat_sel, year_pred, df)
+                        # Usamos los parámetros guardados para la llamada a la IA
+                        res_ia = handle_ia_call(ia_analisis.predecir_exito, params['gen'], params['plat'], params['year'], df)
                         if res_ia:
                             st.success(res_ia)
             else:
-                st.error("Error: Modelo no entrenado o faltan los encoders. Revisa el archivo modelo_ventas.pkl") # Muestra error de modelo no entrenado
+                st.error("Error: Modelo no entrenado o faltan los encoders. Revisa el archivo modelo_ventas.pkl")
 
     display_footer()
 
