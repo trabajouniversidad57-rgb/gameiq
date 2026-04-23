@@ -148,12 +148,21 @@ def handle_ia_call(func, *args, **kwargs):
         if res is None:
             st.error("La IA no devolvió ninguna respuesta. Revisa los logs.")
             return None
+            
+        # Detectar error de cuota (429) en la respuesta
+        if isinstance(res, str) and "429" in res:
+            st.warning("⚠️ **Límite de mensajes alcanzado:** Google Gemini (nivel gratuito) tiene un límite de mensajes por minuto. Por favor, espera 60 segundos y vuelve a intentarlo.")
+            return None
+            
         if isinstance(res, str) and ("Error" in res or "error" in res.lower()):
             st.error(f"Error de IA: {res}")
             return None
         return res
     except Exception as e:
-        st.error(f"Error crítico de conexión: {str(e)}")
+        if "429" in str(e):
+            st.warning("⚠️ **Límite de mensajes alcanzado:** Por favor, espera un minuto para continuar.")
+        else:
+            st.error(f"Error crítico de conexión: {str(e)}")
         return None
 
 def load_html(filename):
