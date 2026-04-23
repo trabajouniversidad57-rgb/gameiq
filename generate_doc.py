@@ -1,4 +1,8 @@
-<!DOCTYPE html>
+import os
+
+def generate():
+    # Contenido HTML profesional generado para GameIQ
+    html_content = """<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -84,4 +88,20 @@
         </footer>
     </div>
 </body>
-</html>
+</html>"""
+
+    # Crear carpeta si no existe
+    output_dir = "outputs"
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+        print(f"Directorio '{output_dir}' creado.")
+
+    # Guardar archivo
+    file_path = os.path.join(output_dir, "GameIQ_Deploy_Fix.html")
+    with open(file_path, "w", encoding="utf-8") as f:
+        f.write(html_content)
+    
+    print(f"Reporte generado exitosamente en: {file_path}")
+
+if __name__ == "__main__":
+    generate()
