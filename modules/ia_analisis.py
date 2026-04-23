@@ -4,9 +4,9 @@ from groq import Groq
 from dotenv import load_dotenv
 import os
 import streamlit as st
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception
+from tenacity import retry, stop_after_attempt, wait_exponential
 
-def obtener_api_key(key_name="GEMINI_API_KEY"):
+def obtener_api_key(key_name="GROQ_API_KEY"):
     """Obtiene la API Key con prioridad: Streamlit Secrets > OS Environ > .env"""
     try:
         if key_name in st.secrets:
@@ -21,37 +21,21 @@ def obtener_api_key(key_name="GEMINI_API_KEY"):
     load_dotenv()
     return os.getenv(key_name)
 
-# Inicialización de clientes
-gemini_key = obtener_api_key("GEMINI_API_KEY")
+# Inicialización de Groq (Motor Principal)
 groq_key = obtener_api_key("GROQ_API_KEY")
-
-client_gemini = genai.Client(api_key=gemini_key) if gemini_key else None
 client_groq = Groq(api_key=groq_key) if groq_key else None
-
-# Lista de modelos por orden de preferencia para 2026
-POTENTIAL_MODELS = ["gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-2.0-flash"]
 GROQ_MODEL = "llama-3.3-70b-versatile"
 
-def is_retryable_exception(exception):
-    """Determina si el error es de cuota (429) o sobrecarga (500/503) para reintentar."""
-    error_msg = str(exception).lower()
-    return "429" in error_msg or "quota" in error_msg or "overloaded" in error_msg
-
 @retry(
-    wait=wait_exponential(multiplier=1, min=4, max=10), 
-    stop=stop_after_attempt(2), # Menos reintentos para Gemini para pasar rápido a Groq si falla
-    retry=retry_if_exception(is_retryable_exception),
+    wait=wait_exponential(multiplier=1, min=2, max=6), 
+    stop=stop_after_attempt(3),
     reraise=True
 )
-def _execute_gemini_call(model_name, prompt):
-    """Ejecución interna de la llamada a Gemini con lógica de reintento."""
-    response = client_gemini.models.generate_content(model=model_name, contents=prompt)
-    return response.text
-
 def _execute_groq_call(prompt):
-    """Ejecución de la llamada a Groq (Fallback)."""
+    """Ejecución de la llamada a Groq con Llama 3."""
     if not client_groq:
-        return None
+        return "Error: No se encontró GROQ_API_KEY. Configúrala en Secrets o .env"
+    
     completion = client_groq.chat.completions.create(
         model=GROQ_MODEL,
         messages=[{"role": "user", "content": prompt}],
@@ -59,41 +43,14 @@ def _execute_groq_call(prompt):
     return completion.choices[0].message.content
 
 def call_gemini(prompt):
-    """Intenta llamar a Gemini probando varios modelos. Si falla por cuota, usa Groq."""
-    if not client_gemini and not client_groq:
-        return "Error: No se encontró GEMINI_API_KEY ni GROQ_API_KEY."
-        
-    last_error = ""
-    # 1. Intentar con Gemini
-    if client_gemini:
-        for model_name in POTENTIAL_MODELS:
-            try:
-                return _execute_gemini_call(model_name, prompt)
-            except Exception as e:
-                last_error = str(e)
-                if "not found" in last_error.lower() or "not supported" in last_error.lower():
-                    continue 
-                
-                # Si es un error de cuota o similar, intentamos con Groq inmediatamente
-                if is_retryable_exception(e):
-                    break 
-                break
-    
-    # 2. Fallback a Groq si Gemini falló o no está configurado
-    if client_groq:
-        try:
-            # Notificar discretamente si estamos en Streamlit
-            try:
-                st.info("🔄 Motor Gemini saturado. Usando respaldo (Groq)...")
-            except: pass
-            
-            res_groq = _execute_groq_call(prompt)
-            if res_groq:
-                return res_groq
-        except Exception as groq_e:
-            last_error += f" | Error en Groq: {str(groq_e)}"
-                
-    return f"Error en IA (Gemini & Groq): {last_error}"
+    """
+    Función de compatibilidad que ahora utiliza Groq como motor principal.
+    Mantiene el nombre para evitar romper el resto de la aplicación.
+    """
+    try:
+        return _execute_groq_call(prompt)
+    except Exception as e:
+        return f"Error en Groq (Llama 3): {str(e)}"
 
 @st.cache_data
 def analizar_genero(genero, df):

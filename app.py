@@ -151,7 +151,7 @@ def handle_ia_call(func, *args, **kwargs):
             
         # Detectar error de cuota (429) en la respuesta
         if isinstance(res, str) and "429" in res:
-            st.warning("⚠️ **Límite de mensajes alcanzado:** Google Gemini (nivel gratuito) tiene un límite de mensajes por minuto. Por favor, espera 60 segundos y vuelve a intentarlo.")
+            st.warning("⚠️ **Límite de mensajes alcanzado:** El motor de IA está saturado. Por favor, espera un momento y vuelve a intentarlo.")
             return None
             
         if isinstance(res, str) and ("Error" in res or "error" in res.lower()):
