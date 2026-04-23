@@ -115,5 +115,6 @@ if __name__ == "__main__":
 
 # CONFIGURACIÓN N8N:
 # Nodo Execute Command: python modules/reporte_semanal.py
-# Nodo HTTP Request (Ollama): POST http://localhost:11434/api/generate
-# Extraer respuesta de Ollama: {{ $json.response }}
+# Nodo HTTP Request (Gemini API): POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=YOUR_API_KEY
+# Extraer respuesta de Gemini: {{ $json.candidates[0].content.parts[0].text }}
+

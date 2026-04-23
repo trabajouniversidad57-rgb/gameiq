@@ -1,9 +1,8 @@
+.env
+.streamlit/secrets.toml
 gameiq_env/
 __pycache__/
 *.pkl
 data/*.csv
 data/*.db
-.DS_Store
-.streamlit/
 outputs/*.html
-!outputs/.gitkeep

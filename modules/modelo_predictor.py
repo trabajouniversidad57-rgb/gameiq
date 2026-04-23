@@ -7,8 +7,9 @@ from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
 import pickle
 import os
 
-# Rutas
-data_dir = 'gameiq/data'
+# Rutas dinámicas para evitar errores dependiendo desde dónde se ejecuta
+current_dir = os.path.dirname(os.path.abspath(__file__))
+data_dir = os.path.join(os.path.dirname(current_dir), 'data')
 model_path = os.path.join(data_dir, 'modelo_ventas.pkl')
 encoder_path = os.path.join(data_dir, 'encoders.pkl')
 
