@@ -104,7 +104,75 @@ Responde en 3 oraciones concretas."""
     except Exception as e:
         return f"Error al conectar con Gemini: {str(e)}"
 
+def generar_plan_capacitacion(genero, plataforma, nivel, horas, objetivos, df):
+    """Genera un plan de capacitación personalizado usando Gemini."""
+    err = check_api_config()
+    if err: return err
+
+    # Obtener métricas del género para dar contexto
+    df_gen = df[df['Genre'] == genero] if not df.empty else pd.DataFrame()
+    ventas = df_gen['Global_Sales'].sum() if not df_gen.empty else 0
+    metascore = df_gen['metascore'].mean() if not df_gen.empty else 0
+    metascore = round(metascore, 1) if not pd.isna(metascore) else "N/A"
+
+    prompt = f"""Eres un experto en gamificación y educación. Basándote en estos datos de un jugador:
+- Género favorito: {genero} (datos históricos: {ventas:.2f}M copias vendidas, metascore promedio: {metascore})
+- Plataforma: {plataforma}
+- Nivel de experiencia: {nivel}
+- Horas semanales de juego: {horas}
+- Objetivos: {", ".join(objetivos)}
+
+Crea un plan de capacitación de 4 semanas con:
+- Semana 1: Fundamentos (qué aprender, 2 recursos específicos)
+- Semana 2: Práctica guiada (ejercicios concretos)
+- Semana 3: Aplicación (proyectos pequeños)
+- Semana 4: Evaluación (cómo medir el progreso)
+- Perfil del jugador: tipo (Competitivo/Casual/Creativo/Estratega) con justificación basada en los datos
+
+Sé específico, usa ejemplos de juegos reales del género seleccionado. Responde en español."""
+
+    try:
+        response = model.generate_content(prompt)
+        return response.text
+    except Exception as e:
+        return f"Error al generar el plan: {str(e)}"
+
+def analizar_oportunidad(genero, plataforma, score):
+    """Genera una explicación estratégica de una oportunidad de mercado."""
+    err = check_api_config()
+    if err: return err
+
+    prompt = f"""Explica en 3 oraciones por qué la combinación {genero}+{plataforma} tiene una oportunidad de mercado con índice {score:.1f}/100. 
+Qué tipo de juego específico podría funcionar bien aquí. Sé directo y accionable para un desarrollador indie. Responde en español."""
+
+    try:
+        response = model.generate_content(prompt)
+        return response.text
+    except Exception as e:
+        return f"Error al analizar oportunidad: {str(e)}"
+
+def chat_coach(pregunta, contexto):
+    """Chatbot con contexto del dataset."""
+    err = check_api_config()
+    if err: return err
+
+    prompt = f"""CONTEXTO DEL DATASET GAMEIQ:
+{contexto}
+
+EL USUARIO PREGUNTA: {pregunta}
+
+INSTRUCCIONES: Responde en máximo 4 oraciones, citando datos específicos del contexto cuando sea relevante. Sé conciso, útil y responde en español."""
+
+    try:
+        response = model.generate_content(prompt)
+        return response.text
+    except Exception as e:
+        return f"Error en el chat: {str(e)}"
+
 if __name__ == "__main__":
+
+
+
     # Rutas de datos
     current_dir = os.path.dirname(os.path.abspath(__file__))
     data_dir = os.path.join(os.path.dirname(current_dir), 'data')

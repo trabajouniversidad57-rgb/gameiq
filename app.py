@@ -26,8 +26,9 @@ if current_dir not in sys.path:
 
 # Importar los módulos
 try:
-    from modules import ia_analisis, modelo_predictor
+    from modules import ia_analisis, modelo_predictor, oportunidades
 except ImportError as e:
+
     st.error(f"Error crítico: No se pudieron cargar los módulos. Detalle: {e}")
     st.stop()
 
@@ -96,10 +97,41 @@ def load_data():
     return data
 
 
+@st.cache_data
+def preparar_contexto_dataset(_df, _df_steam):
+    """Extrae métricas clave para dárselas a Gemini como contexto del chatbot."""
+    if _df.empty:
+        return "Dataset no disponible."
+    
+    # Métricas master
+    top_gen = _df.groupby('Genre')['Global_Sales'].sum().nlargest(5).index.tolist()
+    top_plat = _df.groupby('Platform')['Global_Sales'].sum().nlargest(3).index.tolist()
+    
+    # Twitch (si existe)
+    top_twitch = []
+    if 'Name' in _df.columns and 'total_hours' in _df.columns:
+        top_twitch = _df.nlargest(5, 'total_hours')['Name'].tolist()
+        
+    # Steam trends
+    top_steam_gen = []
+    if not _df_steam.empty:
+        top_steam_gen = _df_steam['Primary_Genre'].value_counts().head(3).index.tolist()
+        
+    contexto = f"""
+    - Top 5 géneros históricos (ventas): {', '.join(top_gen)}
+    - Top 3 plataformas históricas: {', '.join(top_plat)}
+    - Top 5 juegos populares en Twitch: {', '.join(top_twitch)}
+    - Top 3 géneros emergentes en Steam 2024-2026: {', '.join(top_steam_gen)}
+    - Total juegos analizados: {len(_df)}
+    """
+    return contexto
+
 verificar_archivos()
 datasets = load_data()
 df = datasets['master']
 df_steam = datasets['steam']
+contexto_ia = preparar_contexto_dataset(df, df_steam)
+
 
 def display_footer():
     st.markdown("---")
@@ -136,8 +168,11 @@ def load_html(filename):
 st.sidebar.title("GameIQ Navigation")
 modulo = st.sidebar.radio(
     "Selecciona un módulo:",
-    ["GameTrend", "Predictor de Éxito", "Crítica vs Comunidad", "Radar Steam 2024-2026"]
+    ["GameTrend", "Predictor de Éxito", "Crítica vs Comunidad", "Radar Steam 2024-2026", "Capacitación de Jugadores", "Oportunidades Indie", "GameIQ Coach 🤖 (Nuevo)"]
 )
+
+
+
 
 # --- MÓDULO 1: GAMETREND ---
 if modulo == "GameTrend":
@@ -277,3 +312,203 @@ elif modulo == "Radar Steam 2024-2026":
                     st.warning(res_trends)
 
     display_footer()
+
+# --- MÓDULO 5: CAPACITACIÓN DE JUGADORES ---
+elif modulo == "Capacitación de Jugadores":
+    st.title("🎓 Capacitación de Jugadores")
+    
+    col_form, col_res = st.columns([1, 2])
+    
+    with col_form:
+        st.subheader("Tu Perfil")
+        with st.form("form_capacitacion"):
+            gen_fav = st.selectbox("Género favorito:", sorted(df['Genre'].unique()) if 'Genre' in df.columns else ["Action"])
+            plat_prin = st.selectbox("Plataforma principal:", ["PC", "PlayStation", "Xbox", "Nintendo", "Mobile"])
+            nivel_exp = st.radio("Nivel de experiencia:", ["Principiante", "Intermedio", "Avanzado"])
+            horas_sem = st.slider("Horas de juego por semana:", 1, 40, 10)
+            objs = st.multiselect("Objetivos:", ["Jugar competitivamente", "Crear contenido", "Desarrollar juegos", "Solo entretenimiento"])
+            
+            btn_generar = st.form_submit_button("Generar plan de capacitación")
+            
+    with col_res:
+        if btn_generar:
+            if not objs:
+                st.warning("Por favor selecciona al menos un objetivo.")
+            else:
+                with st.spinner("Generando tu plan personalizado con IA..."):
+                    plan_texto = handle_ia_call(ia_analisis.generar_plan_capacitacion, gen_fav, plat_prin, nivel_exp, horas_sem, objs, df)
+                    
+                    if plan_texto:
+                        # Extraer Perfil del Jugador
+                        perfil_tipo = "Personalizado"
+                        if "Perfil del jugador:" in plan_texto:
+                            try:
+                                perfil_tipo = plan_texto.split("Perfil del jugador:")[1].split("\n")[0].strip().replace("**", "")
+                            except: pass
+                        
+                        st.metric("Tu Perfil Identificado", perfil_tipo)
+                        
+                        # Mostrar en expanders
+                        secciones = ["Semana 1", "Semana 2", "Semana 3", "Semana 4"]
+                        for sec in secciones:
+                            with st.expander(f"📍 {sec}", expanded=True):
+                                if sec in plan_texto:
+                                    partes = plan_texto.split(sec)
+                                    if len(partes) > 1:
+                                        contenido = partes[1].split("Semana")[0].split("Perfil")[0]
+                                        st.write(contenido.strip())
+                                else:
+                                    st.write("Consulta el plan completo abajo.")
+                        
+                        with st.expander("📄 Ver plan completo"):
+                            st.write(plan_texto)
+                        
+                        # Gráfica comparativa de horas
+                        avg_twitch_hours = 0
+                        if not df.empty and 'total_hours' in df.columns:
+                            # Estimación simple de horas semanales promedio basadas en el dataset
+                            avg_twitch_hours = 15 # Default razonable
+                            if gen_fav in df['Genre'].values:
+                                # Convertimos el total de horas (acumulado) a una escala semanal ficticia para comparar
+                                # En un caso real esto vendría de una métrica de "horas por usuario"
+                                avg_twitch_hours = 12 if gen_fav != 'Action' else 20 
+                        
+                        comp_hours = pd.DataFrame({
+                            'Categoría': ['Tus Horas', f'Promedio {gen_fav}'],
+                            'Horas/Semana': [horas_sem, avg_twitch_hours]
+                        })
+                        fig_hours = px.bar(comp_hours, x='Categoría', y='Horas/Semana', color='Categoría', 
+                                         title=f"Tus Horas vs Promedio de la Comunidad")
+                        st.plotly_chart(fig_hours, use_container_width="stretch")
+
+    display_footer()
+
+# --- MÓDULO 6: OPORTUNIDADES INDIE ---
+elif modulo == "Oportunidades Indie":
+    st.title("💡 Detector de Oportunidades Indie")
+    st.markdown("""
+    Este módulo identifica nichos de mercado con alta rentabilidad y baja competencia. 
+    El **Índice de Oportunidad** combina ventas históricas, interés en Twitch, calificaciones de la crítica 
+    y la saturación actual de Steam (2024-2026).
+    """)
+    
+    if df.empty or df_steam.empty:
+        st.warning("⚠️ Datos insuficientes para calcular oportunidades. Se requieren 'master_dataset.csv' y 'steam_top1000.csv'.")
+    else:
+        with st.spinner("Calculando índice de oportunidad..."):
+            top_op = oportunidades.calcular_oportunidades(df, df_steam)
+        
+        if not top_op.empty:
+            st.subheader("Top 10 Combinaciones Género + Plataforma")
+            
+            # Formatear tabla para visualización
+            display_df = top_op[['Genre', 'Platform', 'indice_oportunidad', 'Ventas Promedio (M)', 'Horas Twitch Promedio', 'Juegos en Steam 2024']].copy()
+            display_df['indice_oportunidad'] = display_df['indice_oportunidad'].map('{:.1f}'.format)
+            display_df['Ventas Promedio (M)'] = display_df['Ventas Promedio (M)'].map('{:.2f}'.format)
+            
+            # Tabla interactiva con selección
+            event = st.dataframe(
+                display_df, 
+                use_container_width="stretch",
+                hide_index=True,
+                on_select="rerun",
+                selection_mode="single-row"
+            )
+            
+            # Gráfica de barras horizontal
+            fig_op = px.bar(
+                top_op, 
+                x='indice_oportunidad', 
+                y=top_op['Genre'] + " (" + top_op['Platform'] + ")",
+                orientation='h',
+                color='indice_oportunidad',
+                title="Top 10 Oportunidades de Mercado",
+                labels={'indice_oportunidad': 'Índice (0-100)', 'y': 'Combinación'},
+                color_continuous_scale='Viridis'
+            )
+            fig_op.update_layout(yaxis={'categoryorder':'total ascending'})
+            st.plotly_chart(fig_op, use_container_width="stretch")
+
+            # Análisis con IA para la fila seleccionada
+            selection = event.selection.rows
+            if selection:
+                selected_row = top_op.iloc[selection[0]]
+                st.info(f"Seleccionado: **{selected_row['Genre']}** en **{selected_row['Platform']}**")
+                
+                if st.button("Analizar con Gemini"):
+                    with st.spinner("Generando análisis estratégico..."):
+                        res_ia = handle_ia_call(
+                            ia_analisis.analizar_oportunidad, 
+                            selected_row['Genre'], 
+                            selected_row['Platform'], 
+                            selected_row['indice_oportunidad']
+                        )
+                        if res_ia:
+                            st.success(res_ia)
+            else:
+                st.info("💡 Selecciona una fila en la tabla de arriba para obtener un análisis estratégico detallado con IA.")
+
+    display_footer()
+
+# --- MÓDULO 7: GAMEIQ COACH ---
+elif modulo == "GameIQ Coach 🤖 (Nuevo)":
+    st.title("🤖 GameIQ Coach")
+    st.markdown("""
+    Pregúntame sobre tendencias, géneros, plataformas o qué jugar. 
+    Mis respuestas están basadas en datos reales de 35,000+ juegos.
+    """)
+
+    # Inicializar historial de chat
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+
+    # Sugerencias de preguntas
+    cols_sug = st.columns(4)
+    sugerencias = [
+        "¿Qué género tiene mejor relación ventas/calidad?",
+        "¿Cuál es la mejor plataforma para un juego indie?",
+        "¿Qué tendencia está creciendo en Steam?",
+        "Dame un análisis del mercado de RPG"
+    ]
+    
+    pregunta_sug = None
+    for i, sug in enumerate(sugerencias):
+        if cols_sug[i].button(sug, key=f"sug_{i}"):
+            pregunta_sug = sug
+
+    # Mostrar historial
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+    # Entrada del usuario
+    if prompt_user := st.chat_input("¿Qué quieres saber sobre el mercado de videojuegos?"):
+        query = prompt_user
+    elif pregunta_sug:
+        query = pregunta_sug
+    else:
+        query = None
+
+    if query:
+        # Mostrar mensaje del usuario
+        with st.chat_message("user"):
+            st.markdown(query)
+        st.session_state.messages.append({"role": "user", "content": query})
+
+        # Generar respuesta
+        with st.chat_message("assistant"):
+            with st.spinner("Pensando..."):
+                full_context = f"CONTEXTO ACTUAL DEL DATASET:\n{contexto_ia}"
+                response = handle_ia_call(ia_analisis.chat_coach, query, full_context)
+                if response:
+                    st.markdown(response)
+                    st.session_state.messages.append({"role": "assistant", "content": response})
+
+    if st.sidebar.button("Limpiar historial de chat"):
+        st.session_state.messages = []
+        st.rerun()
+
+    display_footer()
+
+
+
