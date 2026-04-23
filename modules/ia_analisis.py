@@ -1,8 +1,7 @@
 import pandas as pd
-import google.generativeai as genai
+from google import genai
 from dotenv import load_dotenv
 import os
-
 import streamlit as st
 
 # Intentar cargar la key desde Streamlit Secrets (Cloud) o .env (Local)
@@ -13,16 +12,15 @@ except Exception:
     load_dotenv()
     api_key = os.getenv("GEMINI_API_KEY")
 
-genai.configure(api_key=api_key)
+# Inicializar el cliente de la nueva SDK (google-genai)
+client = None
+if api_key:
+    client = genai.Client(api_key=api_key)
 
-
-# Configurar el modelo (usamos 1.5-flash-latest para máxima compatibilidad)
-model = genai.GenerativeModel("gemini-1.5-flash-latest")
-
-
+MODEL_NAME = "gemini-1.5-flash" # Modelo estándar para 2026
 
 def check_api_config():
-    if not api_key:
+    if not api_key or client is None:
         return "Error: No se encontró la GEMINI_API_KEY en los secretos ni en el .env."
     return None
 
@@ -34,14 +32,11 @@ def analizar_genero(genero, df):
     if df.empty:
         return "No hay datos para analizar."
         
-    # Filtrar datos por género
     df_gen = df[df['Genre'] == genero]
-    
     ventas_totales = df_gen['Global_Sales'].sum()
     metascore_avg = df_gen['metascore'].mean()
     twitch_hours = df_gen['total_hours'].sum()
     
-    # Manejar posibles NaNs
     metascore_avg = round(metascore_avg, 1) if not pd.isna(metascore_avg) else "N/A"
     
     prompt = f"""Eres un analista senior de la industria del videojuego. 
@@ -50,7 +45,7 @@ ventas {ventas_totales:.2f}M copias, metascore promedio {metascore_avg}, horas e
 Sé específico y accionable."""
 
     try:
-        response = model.generate_content(prompt)
+        response = client.models.generate_content(model=MODEL_NAME, contents=prompt)
         return response.text
     except Exception as e:
         return f"Error al conectar con Gemini: {str(e)}"
@@ -63,11 +58,8 @@ def predecir_exito(genero, plataforma, anio, df):
     if df.empty:
         return "No hay datos para predecir."
         
-    # Filtrar por género y plataforma
     df_sim = df[(df['Genre'] == genero) & (df['Platform'] == plataforma)]
-    
     if df_sim.empty:
-        # Fallback si no hay combinación exacta: filtrar solo por género
         df_sim = df[df['Genre'] == genero]
         
     if df_sim.empty:
@@ -80,7 +72,7 @@ def predecir_exito(genero, plataforma, anio, df):
 Basándote en el rango histórico de {p25:.2f}M a {p75:.2f}M copias, da un estimado razonado en 2 oraciones."""
 
     try:
-        response = model.generate_content(prompt)
+        response = client.models.generate_content(model=MODEL_NAME, contents=prompt)
         return response.text
     except Exception as e:
         return f"Error al conectar con Gemini: {str(e)}"
@@ -101,7 +93,7 @@ def detectar_tendencias(df_steam):
 Responde en 3 oraciones concretas."""
 
     try:
-        response = model.generate_content(prompt)
+        response = client.models.generate_content(model=MODEL_NAME, contents=prompt)
         return response.text
     except Exception as e:
         return f"Error al conectar con Gemini: {str(e)}"
@@ -111,7 +103,6 @@ def generar_plan_capacitacion(genero, plataforma, nivel, horas, objetivos, df):
     err = check_api_config()
     if err: return err
 
-    # Obtener métricas del género para dar contexto
     df_gen = df[df['Genre'] == genero] if not df.empty else pd.DataFrame()
     ventas = df_gen['Global_Sales'].sum() if not df_gen.empty else 0
     metascore = df_gen['metascore'].mean() if not df_gen.empty else 0
@@ -134,7 +125,7 @@ Crea un plan de capacitación de 4 semanas con:
 Sé específico, usa ejemplos de juegos reales del género seleccionado. Responde en español."""
 
     try:
-        response = model.generate_content(prompt)
+        response = client.models.generate_content(model=MODEL_NAME, contents=prompt)
         return response.text
     except Exception as e:
         return f"Error al generar el plan: {str(e)}"
@@ -148,7 +139,7 @@ def analizar_oportunidad(genero, plataforma, score):
 Qué tipo de juego específico podría funcionar bien aquí. Sé directo y accionable para un desarrollador indie. Responde en español."""
 
     try:
-        response = model.generate_content(prompt)
+        response = client.models.generate_content(model=MODEL_NAME, contents=prompt)
         return response.text
     except Exception as e:
         return f"Error al analizar oportunidad: {str(e)}"
@@ -166,42 +157,13 @@ EL USUARIO PREGUNTA: {pregunta}
 INSTRUCCIONES: Responde en máximo 4 oraciones, citando datos específicos del contexto cuando sea relevante. Sé conciso, útil y responde en español."""
 
     try:
-        response = model.generate_content(prompt)
+        response = client.models.generate_content(model=MODEL_NAME, contents=prompt)
         return response.text
     except Exception as e:
         return f"Error en el chat: {str(e)}"
 
 if __name__ == "__main__":
-
-
-
-    # Rutas de datos
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    data_dir = os.path.join(os.path.dirname(current_dir), 'data')
-    master_path = os.path.join(data_dir, 'master_dataset.csv')
-    steam_path = os.path.join(data_dir, 'steam_top1000.csv')
-    
-    if os.path.exists(master_path) and os.path.exists(steam_path):
-        print("Cargando datos para prueba de IA...")
-        df_m = pd.read_csv(master_path)
-        df_s = pd.read_csv(steam_path)
-        
-        # Normalizar para pruebas locales
-        if 'Metascore' in df_m.columns and 'metascore' not in df_m.columns:
-            df_m['metascore'] = df_m['Metascore']
-        if 'Global_Sales' not in df_m.columns:
-            df_m['Global_Sales'] = 0.0
-            
-        print("\n1. Probando: analizar_genero('Action')")
-        print("-" * 30)
-        print(analizar_genero('Action', df_m))
-        
-        print("\n2. Probando: predecir_exito('Shooter', 'PS4', 2025, df_m)")
-        print("-" * 30)
-        print(predecir_exito('Shooter', 'PS4', 2025, df_m))
-        
-        print("\n3. Probando: detectar_tendencias(df_steam)")
-        print("-" * 30)
-        print(detectar_tendencias(df_s))
-    else:
-        print(f"Error: No se encontraron los archivos de datos en {data_dir}")
+    # Prueba local
+    print("Iniciando prueba de IA con el nuevo SDK...")
+    res = analizar_genero('Action', pd.DataFrame({'Genre':['Action'], 'Global_Sales':[10], 'metascore':[80], 'total_hours':[100]}))
+    print(res)
