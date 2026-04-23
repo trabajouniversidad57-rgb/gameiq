@@ -16,8 +16,9 @@ except Exception:
 genai.configure(api_key=api_key)
 
 
-# Configurar el modelo (usamos 1.5-flash para mayor estabilidad en la cuota gratuita)
-model = genai.GenerativeModel("gemini-1.5-flash")
+# Configurar el modelo (usamos 1.5-flash-latest para máxima compatibilidad)
+model = genai.GenerativeModel("gemini-1.5-flash-latest")
+
 
 
 def check_api_config():

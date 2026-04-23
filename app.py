@@ -205,7 +205,7 @@ if modulo == "GameTrend":
 
         st.subheader("Carrera de Plataformas (Histórico)")
         html_race = load_html('03_race_plataformas.html')
-        st.components.v1.iframe(srcdoc=html_race, height=600, scrolling=True)
+        st.components.v1.html(html_race, height=600, scrolling=True)
         
     display_footer()
 
@@ -267,7 +267,7 @@ elif modulo == "Crítica vs Comunidad":
         
         st.subheader("Distribución Metascore vs Userscore")
         html_scatter = load_html('04b_scatter_metascore_userscore.html')
-        st.components.v1.iframe(srcdoc=html_scatter, height=600, scrolling=True)
+        st.components.v1.html(html_scatter, height=600, scrolling=True)
         
         if not df.empty:
             df_copy = df.copy()
@@ -298,11 +298,11 @@ elif modulo == "Radar Steam 2024-2026":
         with col1:
             st.subheader("Popularidad de Géneros en Steam")
             html_steam_gen = load_html('05_steam_generos.html')
-            st.components.v1.iframe(srcdoc=html_steam_gen, height=500)
+            st.components.v1.html(html_steam_gen, height=500)
         with col2:
             st.subheader("Relación Precio vs Rating")
             html_steam_price = load_html('05b_steam_precio_rating.html')
-            st.components.v1.iframe(srcdoc=html_steam_price, height=500)
+            st.components.v1.html(html_steam_price, height=500)
         
         if st.button("Detectar tendencias con IA"):
             with st.spinner("Analizando tendencias en Steam..."):
