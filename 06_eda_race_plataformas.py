@@ -2,9 +2,10 @@ import pandas as pd
 import plotly.express as px
 import os
 
-# Rutas
-input_path = 'gameiq/data/master_dataset.csv'
-output_dir = 'gameiq/outputs'
+# Rutas relativas al script
+base_dir = os.path.dirname(os.path.abspath(__file__))
+input_path = os.path.join(base_dir, 'data', 'master_dataset.csv')
+output_dir = os.path.join(base_dir, 'outputs')
 os.makedirs(output_dir, exist_ok=True)
 
 # 1. Cargar datos

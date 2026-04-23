@@ -3,9 +3,10 @@ import plotly.express as px
 import plotly.graph_objects as go
 import os
 
-# Rutas
-data_dir = 'gameiq/data'
-output_dir = 'gameiq/outputs'
+# Rutas relativas al script
+base_dir = os.path.dirname(os.path.abspath(__file__))
+data_dir = os.path.join(base_dir, 'data')
+output_dir = os.path.join(base_dir, 'outputs')
 os.makedirs(output_dir, exist_ok=True)
 
 # --- PARTE A: Crítica vs Comunidad (master_dataset.csv) ---
