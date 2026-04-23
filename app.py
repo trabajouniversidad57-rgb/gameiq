@@ -202,7 +202,7 @@ if modulo == "GameTrend":
             if not df_filtered.empty:
                 sales_by_year = df_filtered.groupby('Year')['Global_Sales'].sum().reset_index()
                 fig = px.line(sales_by_year, x='Year', y='Global_Sales', title=f"Ventas Globales de {genero_sel} por Año")
-                st.plotly_chart(fig, use_container_width="stretch")
+                st.plotly_chart(fig, width="stretch")
             else:
                 st.info("No hay datos para el rango seleccionado.")
 
@@ -252,7 +252,7 @@ elif modulo == "Predictor de Éxito":
                     'Ventas': [pred_val, avg_hist]
                 })
                 fig_comp = px.bar(comp_df, x='Categoría', y='Ventas', color='Categoría', title="Comparativa vs Promedio del Género")
-                st.plotly_chart(fig_comp, use_container_width="stretch")
+                st.plotly_chart(fig_comp, width="stretch")
                 
                 if st.button("Explicar con IA"):
                     with st.spinner("Analizando predicción..."):
@@ -292,7 +292,7 @@ elif modulo == "Crítica vs Comunidad":
                 top_brecha = df_copy.nlargest(10, 'Brecha')[['Name', 'Genre', 'metascore', 'User_Score', 'Brecha']]
                 
                 st.subheader("Top 10 Juegos con mayor brecha entre críticos y jugadores")
-                st.dataframe(top_brecha, use_container_width=True)
+                st.dataframe(top_brecha, width="stretch")
 
     display_footer()
 
@@ -388,7 +388,7 @@ elif modulo == "Capacitación de Jugadores":
                         })
                         fig_hours = px.bar(comp_hours, x='Categoría', y='Horas/Semana', color='Categoría', 
                                          title=f"Tus Horas vs Promedio de la Comunidad")
-                        st.plotly_chart(fig_hours, use_container_width="stretch")
+                        st.plotly_chart(fig_hours, width="stretch")
 
     display_footer()
 
@@ -418,7 +418,7 @@ elif modulo == "Oportunidades Indie":
             # Tabla interactiva con selección
             event = st.dataframe(
                 display_df, 
-                use_container_width="stretch",
+                width="stretch",
                 hide_index=True,
                 on_select="rerun",
                 selection_mode="single-row"
@@ -436,7 +436,7 @@ elif modulo == "Oportunidades Indie":
                 color_continuous_scale='Viridis'
             )
             fig_op.update_layout(yaxis={'categoryorder':'total ascending'})
-            st.plotly_chart(fig_op, use_container_width="stretch")
+            st.plotly_chart(fig_op, width="stretch")
 
             # Análisis con IA para la fila seleccionada
             selection = event.selection.rows
