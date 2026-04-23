@@ -5,4 +5,5 @@ __pycache__/
 *.pkl
 data/*.csv
 data/*.db
-outputs/*.html
+# outputs/*.html (Habilitado para reportes)
+
