@@ -1,120 +1,116 @@
 import pandas as pd
-import numpy as np
 import json
 import os
-from datetime import datetime, timedelta
+from datetime import datetime
 
-def main():
-    # 1. Carga data/steam_top1000.csv
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    data_path = os.path.join(base_dir, 'data', 'steam_top1000.csv')
-    
-    if not os.path.exists(data_path):
-        print(f"Error: No se encontró el archivo en {data_path}")
+def generar_reporte():
+    # Rutas de archivos
+    steam_path = 'gameiq/data/steam_top1000.csv'
+    master_path = 'gameiq/data/master_dataset.csv'
+    output_path = 'gameiq/data/reporte_semanal.json'
+
+    # 1. Cargar datos
+    if not os.path.exists(steam_path) or not os.path.exists(master_path):
+        print(f"Error: No se encontraron los archivos en {steam_path} o {master_path}")
         return
 
-    df = pd.read_csv(data_path)
-    total_juegos = len(df)
+    df_steam = pd.read_csv(steam_path)
+    df_master = pd.read_csv(master_path)
 
-    # Convertir Release_Date a datetime ignorando errores para que queden NaT
-    df['Release_Date'] = pd.to_datetime(df['Release_Date'], errors='coerce', format='mixed')
-
-    # 2. Calcula top 5 géneros con más juegos (con count y rating promedio)
-    genre_stats = df.groupby('Primary_Genre').agg(
-        cantidad=('AppID', 'count'),
-        rating_promedio=('Review_Score_Pct', 'mean')
-    ).reset_index()
+    # 2. Calcular métricas
     
-    top_5 = genre_stats.nlargest(5, 'cantidad')
-
-    # 3. Calcula si cada género creció más del 20% comparado con el período anterior
-    # Usamos la fecha máxima disponible como referencia "actual" si hay fechas, 
-    # si no usamos now() - pero el dataset tiene fechas del 2026.
-    max_date = df['Release_Date'].max()
+    # top_5_generos_steam: los 5 géneros con más juegos en Steam (con count y rating promedio)
+    top_5_steam_df = df_steam.groupby('Primary_Genre').agg(
+        count=('AppID', 'count'),
+        avg_rating=('Review_Score_Pct', 'mean')
+    ).sort_values(by='count', ascending=False).head(5)
     
-    if pd.notna(max_date):
-        current_start = max_date - timedelta(days=7)
-        prev_start = max_date - timedelta(days=14)
-
-        df_current = df[(df['Release_Date'] > current_start) & (df['Release_Date'] <= max_date)]
-        df_prev = df[(df['Release_Date'] > prev_start) & (df['Release_Date'] <= current_start)]
-
-        current_counts = df_current['Primary_Genre'].value_counts()
-        prev_counts = df_prev['Primary_Genre'].value_counts()
-    else:
-        current_counts = {}
-        prev_counts = {}
-
-    top_generos_list = []
-    for _, row in top_5.iterrows():
-        gen = row['Primary_Genre']
-        cant = int(row['cantidad'])
-        rating = round(float(row['rating_promedio']), 2)
-        
-        c_count = current_counts.get(gen, 0)
-        p_count = prev_counts.get(gen, 0)
-        
-        alerta = False
-        if p_count > 0:
-            growth = (c_count - p_count) / p_count
-            if growth > 0.20:
-                alerta = True
-        elif p_count == 0 and c_count > 0:
-             # Creció de 0 a algo, por lo tanto creció más del 20%
-             alerta = True
-             
-        top_generos_list.append({
-            "genero": gen,
-            "cantidad": cant,
-            "rating_promedio": rating,
-            "alerta_crecimiento": alerta
+    top_5_generos_steam = []
+    for genre, row in top_5_steam_df.iterrows():
+        top_5_generos_steam.append({
+            "genero": genre,
+            "cantidad": int(row['count']),
+            "rating_promedio": round(float(row['avg_rating']), 2)
         })
 
-    # 4. Determina la franja de precio dominante
-    conditions = [
-        (df['Price_USD'] < 15),
-        (df['Price_USD'] >= 15) & (df['Price_USD'] <= 30),
-        (df['Price_USD'] > 30)
-    ]
-    choices = ['low', 'mid', 'high']
-    df['price_tier'] = np.select(conditions, choices, default='unknown')
+    # top_3_ventas_historicas: los 3 géneros con más ventas históricas globales (de VGSales)
+    top_3_ventas_df = df_master.groupby('Genre')['Global_Sales'].sum().sort_values(ascending=False).head(3)
+    top_3_ventas_historicas = top_3_ventas_df.index.tolist()
+
+    # alerta_crecimiento: cualquier género que aparezca en top_5_steam pero NO esté en top_3_ventas
+    steam_genres = [g['genero'] for g in top_5_generos_steam]
+    generos_emergentes = [g for g in steam_genres if g not in top_3_ventas_historicas]
     
-    # Excluir 'unknown' o NA si existen, y contar
-    tiers = df['price_tier'].value_counts()
-    if 'unknown' in tiers and len(tiers) > 1:
-        tiers = tiers.drop('unknown')
-        
-    precio_dominante = tiers.index[0] if not tiers.empty else 'unknown'
+    alerta = len(generos_emergentes) > 0
 
-    # Género emergente: fuera del top 5, con mejor rating promedio (mínimo 2 juegos)
-    top_5_names = top_5['Primary_Genre'].tolist()
-    other_genres = genre_stats[(~genre_stats['Primary_Genre'].isin(top_5_names)) & (genre_stats['cantidad'] >= 2)]
-    if not other_genres.empty:
-        genero_emergente = other_genres.nlargest(1, 'rating_promedio')['Primary_Genre'].iloc[0]
-    else:
-        genero_emergente = None
+    # precio_promedio_steam: precio promedio del top 1000 Steam
+    precio_promedio = round(df_steam['Price_USD'].mean(), 2)
 
-    # 5. Genera y guarda data/reporte_semanal.json
+    # total_analizados: número total de juegos procesados esta semana
+    total_analizados = len(df_steam)
+
+    # 3. Construir texto_para_gemini
+    top_5_str = ", ".join([f"{g['genero']} ({g['cantidad']} juegos, {g['rating_promedio']}% rating)" for g in top_5_generos_steam])
+    top_3_hist_str = ", ".join(top_3_ventas_historicas)
+    emergentes_str = ", ".join(generos_emergentes) if generos_emergentes else 'ninguno'
+
+    texto_para_gemini = f"""Eres un analista senior de videojuegos. Analiza estos datos de mercado de esta semana:
+TOP 5 géneros en Steam 2024-2026: {top_5_str}
+TOP 3 géneros históricos por ventas: {top_3_hist_str}
+Géneros emergentes detectados: {emergentes_str}
+Precio promedio del mercado: ${precio_promedio}
+
+Dame un briefing ejecutivo de exactamente 3 párrafos:
+1. ¿Qué está pasando en el mercado esta semana?
+2. ¿Qué oportunidad o riesgo ves para desarrolladores?
+3. ¿Qué recomendarías a un streamer de videojuegos esta semana?
+Sé específico y usa los datos."""
+
+    # 4. Estructura JSON
     reporte = {
         "fecha": datetime.now().strftime("%Y-%m-%d"),
-        "top_generos": top_generos_list,
-        "precio_dominante": precio_dominante,
-        "total_juegos_analizados": total_juegos,
-        "genero_emergente": genero_emergente
+        "top_generos": top_5_generos_steam,
+        "generos_emergentes": generos_emergentes,
+        "precio_promedio": precio_promedio,
+        "total_analizados": total_analizados,
+        "texto_para_gemini": texto_para_gemini,
+        "alerta": alerta
     }
 
-    out_path = os.path.join(base_dir, 'data', 'reporte_semanal.json')
-    with open(out_path, 'w', encoding='utf-8') as f:
+    # Guardar reporte
+    with open(output_path, 'w', encoding='utf-8') as f:
         json.dump(reporte, f, indent=2, ensure_ascii=False)
 
-    # 6. Imprime el JSON generado en consola
-    print(json.dumps(reporte, indent=2, ensure_ascii=False))
+    # 5. Resumen en consola
+    print("=== RESUMEN REPORTE SEMANAL GAMEIQ ===")
+    print(f"Fecha: {reporte['fecha']}")
+    print(f"Total juegos analizados: {total_analizados}")
+    print(f"Precio promedio: ${precio_promedio}")
+    print(f"Géneros emergentes: {emergentes_str}")
+    print(f"Alerta activa: {alerta}")
+    print(f"Reporte guardado en: {output_path}")
+    print("=======================================")
 
 if __name__ == "__main__":
-    main()
+    generar_reporte()
 
-# CONFIGURACIÓN N8N:
-# Nodo Execute Command: python modules/reporte_semanal.py
-# Nodo HTTP Request (Gemini API): POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=YOUR_API_KEY
-# Extraer respuesta de Gemini: {{ $json.candidates[0].content.parts[0].text }}
-
+"""
+Configuración n8n sugerida:
+1. Schedule Trigger: Every Week (Monday 08:00 AM)
+2. Execute Command: python gameiq/modules/reporte_semanal.py (Asegúrate de estar en el directorio raíz o ajustar la ruta)
+3. Leer Archivo (Read File): gameiq/data/reporte_semanal.json
+4. HTTP Request (Gemini):
+   - Method: POST
+   - URL: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={{$vars.GEMINI_API_KEY}}
+   - Body Parameters:
+     {
+       "contents": [{
+         "parts": [{
+           "text": "{{ $json.texto_para_gemini }}"
+         }]
+       }]
+     }
+5. Extract Text Expression: {{ $json.candidates[0].content.parts[0].text }}
+6. IF Node: {{ $json.alerta }} is true
+7. Telegram/Slack Node: Enviar mensaje con el análisis extraído.
+"""

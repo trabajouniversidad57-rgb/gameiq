@@ -1,38 +1,40 @@
 {
-  "fecha": "2026-04-22",
+  "fecha": "2026-04-23",
   "top_generos": [
     {
       "genero": "Action",
       "cantidad": 579,
-      "rating_promedio": 78.97,
-      "alerta_crecimiento": true
+      "rating_promedio": 78.97
     },
     {
       "genero": "Adventure",
       "cantidad": 102,
-      "rating_promedio": 83.77,
-      "alerta_crecimiento": false
+      "rating_promedio": 83.77
     },
     {
       "genero": "Indie",
       "cantidad": 73,
-      "rating_promedio": 82.63,
-      "alerta_crecimiento": false
+      "rating_promedio": 82.63
     },
     {
       "genero": "RPG",
       "cantidad": 71,
-      "rating_promedio": 75.69,
-      "alerta_crecimiento": false
+      "rating_promedio": 75.69
     },
     {
       "genero": "Casual",
       "cantidad": 63,
-      "rating_promedio": 86.9,
-      "alerta_crecimiento": false
+      "rating_promedio": 86.9
     }
   ],
-  "precio_dominante": "low",
-  "total_juegos_analizados": 1000,
-  "genero_emergente": "Early Access"
+  "generos_emergentes": [
+    "Adventure",
+    "Indie",
+    "RPG",
+    "Casual"
+  ],
+  "precio_promedio": 21.99,
+  "total_analizados": 1000,
+  "texto_para_gemini": "Eres un analista senior de videojuegos. Analiza estos datos de mercado de esta semana:\nTOP 5 géneros en Steam 2024-2026: Action (579 juegos, 78.97% rating), Adventure (102 juegos, 83.77% rating), Indie (73 juegos, 82.63% rating), RPG (71 juegos, 75.69% rating), Casual (63 juegos, 86.9% rating)\nTOP 3 géneros históricos por ventas: Action, Sports, Shooter\nGéneros emergentes detectados: Adventure, Indie, RPG, Casual\nPrecio promedio del mercado: $21.99\n\nDame un briefing ejecutivo de exactamente 3 párrafos:\n1. ¿Qué está pasando en el mercado esta semana?\n2. ¿Qué oportunidad o riesgo ves para desarrolladores?\n3. ¿Qué recomendarías a un streamer de videojuegos esta semana?\nSé específico y usa los datos.",
+  "alerta": true
 }
